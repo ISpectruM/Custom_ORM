@@ -3,6 +3,7 @@ import orm.Connector;
 import orm.EntityManager;
 import java.sql.SQLException;
 import java.util.Date;
+import java.util.List;
 import java.util.Scanner;
 
 public class Main {
@@ -18,12 +19,11 @@ public class Main {
 
         Connector.createConnection(username,password,dbName);
 
-        User user  = new User("nakovvv",19,new Date());
-        user.setId(1);
+//        User user  = new User("Petar",20,new Date());
+//        user.setId(1);
         EntityManager<User> em = new EntityManager<>(Connector.getConnection());
-        User tableUser = em.findFirst(User.class,"age > 15");
-        System.out.println("Username: "+tableUser.getUsername());
-        System.out.println("Age: " + tableUser.getAge());
+        Iterable<User> users = em.find(User.class,"age > 15");
+        System.out.println();
 
     }
 }

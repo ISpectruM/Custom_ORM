@@ -4,14 +4,18 @@ import annotations.Column;
 import annotations.Entity;
 import annotations.Id;
 
+import javax.management.relation.RelationSupport;
+import javax.swing.plaf.nimbus.State;
 import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 public class EntityManager<E> implements DbContext<E> {
     private Connection connection;
@@ -31,16 +35,43 @@ public class EntityManager<E> implements DbContext<E> {
         return this.doUpdate(entity,primary);
     }
 
-    public Iterable<E> find(Class<E> table) {
-        return null;
+    public Iterable<E> find(Class<E> table) throws SQLException, IllegalAccessException, InstantiationException {
+        Statement statement = connection.createStatement();
+        String query = "SELECT * FROM " + this.getTableName(table) + ";";
+        ResultSet result = statement.executeQuery(query);
+        List<E> entities = new ArrayList<>();
+        while (result.next()){
+            E entity = table.newInstance();
+            this.fillEntity(table,result,entity);
+            entities.add(entity);
+        }
+
+        return entities;
     }
 
-    public Iterable<E> find(Class<E> table, String where) {
-        return null;
+    public Iterable<E> find(Class<E> table, String where) throws SQLException, IllegalAccessException, InstantiationException {
+        Statement statement = connection.createStatement();
+        String query = "SELECT * FROM " + this.getTableName(table) +
+                " WHERE " + where + ";";
+        ResultSet result = statement.executeQuery(query);
+        List<E> entities = new ArrayList<>();
+
+        while (result.next()){
+            E entity = table.newInstance();
+            this.fillEntity(table,result,entity);
+            entities.add(entity);
+        }
+        return entities;
     }
 
-    public E findFirst(Class<E> table) {
-        return null;
+    public E findFirst(Class<E> table) throws SQLException, IllegalAccessException, InstantiationException {
+        Statement statement = connection.createStatement();
+        String query = "SELECT * FROM " + this.getTableName(table) + " LIMIT 1";
+        ResultSet result = statement.executeQuery(query);
+        result.next();
+        E entity = table.newInstance();
+        this.fillEntity(table,result,entity);
+        return entity;
     }
 
     @Override
@@ -62,7 +93,10 @@ public class EntityManager<E> implements DbContext<E> {
             Field currField = fields[i];
             currField.setAccessible(true);
 
-            this.fillField(currField,result,currField.getAnnotation(Column.class).name(),entity);
+            this.fillField(currField,
+                    result,
+                    currField.getAnnotation(Column.class).name(),
+                    entity);
         }
     }
 

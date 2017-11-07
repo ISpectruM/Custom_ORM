@@ -7,9 +7,9 @@ import java.util.Properties;
 
 public class Connector {
     private static final String URL = "jdbc:mysql://localhost:3306/";
-    private static Connection connection;
+    private Connection connection;
 
-    public static void createConnection(String username,String password,String dbName) throws SQLException {
+    public void createConnection(String username,String password,String dbName) throws SQLException {
         Properties props = new Properties();
         props.setProperty("user",username);
         props.setProperty("password", password);
@@ -17,7 +17,7 @@ public class Connector {
         connection = DriverManager.getConnection(URL+dbName,props);
     }
 
-    public static Connection getConnection() {
-        return connection;
+    public Connection getConnection() {
+        return this.connection;
     }
 }

@@ -78,12 +78,22 @@ public class EntityManager<E> implements DbContext<E> {
     public E findFirst(Class<E> table, String where)
             throws SQLException, IllegalAccessException, InstantiationException {
         Statement statement = connection.createStatement();
-        String query = "SELECT * FROM " + this.getTableName(table) +" WHERE "+ where + " LIMIT 1";
+        String query = "SELECT * FROM " + this.getTableName(table)
+                +" WHERE "+ where + " LIMIT 1";
         ResultSet result =  statement.executeQuery(query);
         E entity = table.newInstance();
         result.next();
         this.fillEntity(table,result,entity);
         return entity;
+    }
+
+    public void doDelete(Class<?> table, String criteria) throws Exception {
+        String tableName = table.getAnnotation(Entity.class).name();
+        if (!this.checkIfTableExists(tableName)){
+            throw new Exception("Table does not exists");
+        }
+        String query = "DELETE FROM " + tableName + " WHERE "+criteria;
+        this.connection.prepareStatement(query).execute();
     }
 
     private void fillEntity(Class<E> table, ResultSet result, E entity) throws SQLException, IllegalAccessException {
@@ -120,7 +130,8 @@ public class EntityManager<E> implements DbContext<E> {
     }
 
     private boolean doUpdate(E entity, Field primary) throws IllegalAccessException, SQLException {
-        String query = "UPDATE " + this.getTableName(entity.getClass()) + " SET ";
+        String query = "UPDATE " + this.getTableName(entity.getClass())
+                + " SET ";
         String columnsAndValues = "";
         String where = "";
 
@@ -131,7 +142,8 @@ public class EntityManager<E> implements DbContext<E> {
             currField.setAccessible(true);
 
             if (currField.getName().equals(primary.getName())) {
-                where += " WHERE `" + currField.getAnnotation(Column.class).name() + "` = " + currField.get(entity);
+                where += " WHERE `" + currField.getAnnotation(Column.class).name()
+                        + "` = " + currField.get(entity);
             } else {
                 if (currField.get(entity) instanceof Date) {
                     columnsAndValues += "`" + currField.getAnnotation(Column.class).name()
@@ -152,35 +164,54 @@ public class EntityManager<E> implements DbContext<E> {
 
     private boolean doInsert(E entity, Field primary) throws IllegalAccessException, SQLException {
         String tableName = getTableName(entity.getClass());
-        Field[] entityFields = entity.getClass().getDeclaredFields();
+
+        if (!this.checkIfTableExists(tableName)){
+            this.doCreate(entity);
+        }
+
         String query = "INSERT INTO " + tableName +" (";
 
         String columns = "";
         String values = "";
 
-        for (int i = 1; i < entityFields.length; i++) {
+        Field[] entityFields = entity.getClass().getDeclaredFields();
+        for (int i = 0; i < entityFields.length; i++) {
             Field currField = entityFields[i];
             currField.setAccessible(true);
+            if(!currField.getName().equals(primary.getName())){
+                columns += "`" + currField.getAnnotation(Column.class).name() + "`";
 
-            columns += "`" + currField.getAnnotation(Column.class).name() + "`";
-            Object value;
-            if (currField.get(entity) instanceof Date){
-                value = new SimpleDateFormat("yyyy-MM-dd")
-                        .format(currField.get(entity));
-            } else {
-                value = currField.get(entity);
+                Column columnAnnotation = currField.getAnnotation(Column.class);
+                if (!this.checkIfFieldExists(tableName,columnAnnotation.name())){
+                    this.doAlter(tableName,currField);
+                }
+
+                Object value;
+                if (currField.get(entity) instanceof Date){
+                    value = new SimpleDateFormat("yyyy-MM-dd")
+                            .format(currField.get(entity));
+                } else {
+                    value = currField.get(entity);
+                }
+
+                values += "'" + value + "'";
+
+                if (i < entityFields.length-1){
+                    columns += ", ";
+                    values += ", ";
+                }
             }
-
-            values += "'" + value + "'";
-
-            if (i < entityFields.length-1){
-                columns += ", ";
-                values += ", ";
-            }
-
         }
         query += columns + ") VALUES (" + values + ");";
         return connection.prepareStatement(query).execute();
+    }
+
+    private void doAlter(String tableName, Field currField) throws SQLException {
+        Column column = currField.getAnnotation(Column.class);
+        String query = "ALTER TABLE " + tableName +
+                " ADD column " + column.name()+
+                " " + this.getDbTypes(currField);
+        this.connection.prepareStatement(query).execute();
     }
 
     private String getTableName(Class entity){
@@ -194,5 +225,70 @@ public class EntityManager<E> implements DbContext<E> {
             table = entity.getClass().getSimpleName();
         }
         return table;
+    }
+
+    private <E> boolean doCreate(E entity) throws SQLException {
+        String query = "CREATE TABLE " + this.getTableName(entity.getClass())+ "(";
+
+        Field[] fields = entity.getClass().getDeclaredFields();
+        for (int i = 0; i < fields.length; i++) {
+
+            Field currField = fields[i];
+            currField.setAccessible(true);
+
+            query += "`" + currField.getAnnotation(Column.class).name() + "` " +
+                    this.getDbTypes(currField) ;
+            if(currField.isAnnotationPresent(Id.class)){
+                query += " PRIMARY KEY AUTO_INCREMENT";
+            }
+            if (i < fields.length-1){
+                query += ", ";
+            }
+        }
+        query += ")";
+        return this.connection.prepareStatement(query).execute();
+    }
+
+    private String getDbTypes(Field field){
+        String type = "";
+        switch (field.getType().getSimpleName()){
+            case "int" :
+                type = "INT";
+                break;
+            case "Integer":
+                type = "INT";
+                break;
+            case "String":
+                type = "VARCHAR(30)";
+                break;
+            case "Date":
+                type = "DATETIME";
+                break;
+        }
+        return  type;
+    }
+
+    private boolean checkIfTableExists(String tableName) throws SQLException {
+        String query = "SELECT table_name FROM information_schema.tables " +
+                "WHERE table_schema = 'orm_db' AND table_name = '"+tableName + "' LIMIT 1;";
+
+        ResultSet rs =  this.connection.prepareStatement(query).executeQuery();
+
+        if (!rs.first()){
+            return false;
+        }
+        return true;
+    }
+
+    private boolean checkIfFieldExists(String tableName ,String fieldName) throws SQLException {
+        String query = "SELECT column_name FROM information_schema.`COLUMNS` " +
+                "WHERE table_schema = 'orm_db' " +
+                "AND table_name =  '" + tableName +
+                "' AND column_name = '" + fieldName + "'";
+         ResultSet rs = this.connection.prepareStatement(query).executeQuery();
+         if (!rs.first()){
+             return false;
+         }
+         return true;
     }
 }

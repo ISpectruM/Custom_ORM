@@ -1,13 +1,13 @@
+import entities.ExampleEntity;
 import entities.User;
 import orm.Connector;
 import orm.EntityManager;
 import java.sql.SQLException;
 import java.util.Date;
-import java.util.List;
 import java.util.Scanner;
 
 public class Main {
-    public static void main(String[] args) throws SQLException, IllegalAccessException, InstantiationException {
+    public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
 
         String username = "root";
@@ -17,13 +17,13 @@ public class Main {
         String dbName = "orm_db";
 //                scanner.nextLine().trim();
 
-        Connector.createConnection(username,password,dbName);
+        Connector connector = new Connector();
+        connector.createConnection(username,password,dbName);
 
-//        User user  = new User("Petar",20,new Date());
-//        user.setId(1);
-        EntityManager<User> em = new EntityManager<>(Connector.getConnection());
-        Iterable<User> users = em.find(User.class,"age > 15");
-        System.out.println();
+        User user  = new User("Petar",20,new Date());
+        ExampleEntity ex = new ExampleEntity("kolyo","pomo");
+        EntityManager<ExampleEntity> em = new EntityManager<>(connector.getConnection());
+        em.doDelete(ExampleEntity.class, "full_name LIKE 'kolyo'");
 
     }
 }

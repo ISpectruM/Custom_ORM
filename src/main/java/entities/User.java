@@ -16,14 +16,17 @@ public class User {
     private int age;
     @Column(name = "registration_date")
     private Date registrationDate;
+    @Column(name = "password")
+    private int password;
 
     public User() {
     }
 
-    public User(String username, int age, Date registrationDate) {
+    public User(String username, int age, Date registrationDate, int password) {
         this.username = username;
         this.age = age;
         this.registrationDate = registrationDate;
+        this.password = password;
     }
 
     public String getUsername() {

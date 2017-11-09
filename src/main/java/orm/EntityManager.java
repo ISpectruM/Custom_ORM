@@ -3,9 +3,8 @@ package orm;
 import annotations.Column;
 import annotations.Entity;
 import annotations.Id;
+import orm.Strategies.SchemaInitializationStrategy;
 
-import javax.management.relation.RelationSupport;
-import javax.swing.plaf.nimbus.State;
 import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -19,9 +18,17 @@ import java.util.List;
 
 public class EntityManager<E> implements DbContext<E> {
     private Connection connection;
+    private String dataSource;
+    private SchemaInitializationStrategy strategy;
 
-    public EntityManager(Connection connection) {
+    public EntityManager(Connection connection,
+                         String dataSource,
+                         SchemaInitializationStrategy strategy) throws SQLException, IllegalAccessException {
         this.connection = connection;
+        this.dataSource = dataSource;
+        this.strategy = strategy;
+
+        strategy.execute();
     }
 
     public boolean persist(E entity) throws IllegalAccessException, SQLException {
@@ -214,6 +221,31 @@ public class EntityManager<E> implements DbContext<E> {
         this.connection.prepareStatement(query).execute();
     }
 
+
+    private boolean checkIfTableExists(String tableName) throws SQLException {
+        String query = "SELECT table_name FROM information_schema.tables " +
+                "WHERE table_schema = 'orm_db' AND table_name = '"+tableName + "' LIMIT 1;";
+
+        ResultSet rs =  this.connection.prepareStatement(query).executeQuery();
+
+        if (!rs.first()){
+            return false;
+        }
+        return true;
+    }
+
+    private boolean checkIfFieldExists(String tableName ,String fieldName) throws SQLException {
+        String query = "SELECT column_name FROM information_schema.`COLUMNS` " +
+                "WHERE table_schema = 'orm_db' " +
+                "AND table_name =  '" + tableName +
+                "' AND column_name = '" + fieldName + "'";
+         ResultSet rs = this.connection.prepareStatement(query).executeQuery();
+         if (!rs.first()){
+             return false;
+         }
+         return true;
+    }
+
     private String getTableName(Class entity){
         String table = "";
         if (entity.isAnnotationPresent(Entity.class)){
@@ -225,6 +257,25 @@ public class EntityManager<E> implements DbContext<E> {
             table = entity.getClass().getSimpleName();
         }
         return table;
+    }
+
+    private String getDbTypes(Field field){
+        String type = "";
+        switch (field.getType().getSimpleName()){
+            case "int" :
+                type = "INT";
+                break;
+            case "Integer":
+                type = "INT";
+                break;
+            case "String":
+                type = "VARCHAR(30)";
+                break;
+            case "Date":
+                type = "DATETIME";
+                break;
+        }
+        return  type;
     }
 
     private <E> boolean doCreate(E entity) throws SQLException {
@@ -249,46 +300,7 @@ public class EntityManager<E> implements DbContext<E> {
         return this.connection.prepareStatement(query).execute();
     }
 
-    private String getDbTypes(Field field){
-        String type = "";
-        switch (field.getType().getSimpleName()){
-            case "int" :
-                type = "INT";
-                break;
-            case "Integer":
-                type = "INT";
-                break;
-            case "String":
-                type = "VARCHAR(30)";
-                break;
-            case "Date":
-                type = "DATETIME";
-                break;
-        }
-        return  type;
-    }
-
-    private boolean checkIfTableExists(String tableName) throws SQLException {
-        String query = "SELECT table_name FROM information_schema.tables " +
-                "WHERE table_schema = 'orm_db' AND table_name = '"+tableName + "' LIMIT 1;";
-
-        ResultSet rs =  this.connection.prepareStatement(query).executeQuery();
-
-        if (!rs.first()){
-            return false;
-        }
-        return true;
-    }
-
-    private boolean checkIfFieldExists(String tableName ,String fieldName) throws SQLException {
-        String query = "SELECT column_name FROM information_schema.`COLUMNS` " +
-                "WHERE table_schema = 'orm_db' " +
-                "AND table_name =  '" + tableName +
-                "' AND column_name = '" + fieldName + "'";
-         ResultSet rs = this.connection.prepareStatement(query).executeQuery();
-         if (!rs.first()){
-             return false;
-         }
-         return true;
+    public Connection getConnection() {
+        return this.connection;
     }
 }

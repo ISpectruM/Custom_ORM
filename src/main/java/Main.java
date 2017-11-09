@@ -1,29 +1,29 @@
-import entities.ExampleEntity;
-import entities.User;
 import orm.Connector;
 import orm.EntityManager;
-import java.sql.SQLException;
-import java.util.Date;
-import java.util.Scanner;
+import orm.EntityManagerBuilder;
+import orm.Strategies.UpdateStrategy;
+import orm.scanner.EntityScanner;
+
+import java.util.List;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        Scanner scanner = new Scanner(System.in);
+       List<Class> allEnt = EntityScanner.getAllEntities(System.getProperty("user.dir"));
+        Connector connector = new Connector(new EntityManagerBuilder());
 
-        String username = "root";
-//                scanner.nextLine().trim();
-        String password = "MonteSq@21";
-//                scanner.nextLine().trim();
-        String dbName = "orm_db";
-//                scanner.nextLine().trim();
-
-        Connector connector = new Connector();
-        connector.createConnection(username,password,dbName);
-
-        User user  = new User("Petar",20,new Date());
-        ExampleEntity ex = new ExampleEntity("kolyo","pomo");
-        EntityManager<ExampleEntity> em = new EntityManager<>(connector.getConnection());
-        em.doDelete(ExampleEntity.class, "full_name LIKE 'kolyo'");
-
+        EntityManagerBuilder emb = new EntityManagerBuilder();
+        EntityManager em = emb
+                .configureConnectionString()
+                .setDriver("jdbc")
+                .setAdapter("mysql")
+                .setHost("localhost")
+                .setPort("3306")
+                .setUser("root")
+                .setPass("MonteSq@21")
+                .createConnection()
+                .configureCreationType()
+                .set(UpdateStrategy.class)
+                .setDataSource("asd")
+                .build();
     }
 }
